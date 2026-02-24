@@ -1,4 +1,4 @@
-# cp — Interactive Git Cherry-Pick Helper
+# git-cp — Interactive Git Cherry-Pick Helper
 
 A C# CLI tool that makes `git cherry-pick` simple and visual. Browse commits,
 select one or many with a checkbox list, choose a target branch, and handle
@@ -43,7 +43,7 @@ dotnet run
 
 # Build a Release binary
 dotnet build -c Release
-./bin/Release/net10.0/cp
+./bin/Release/net10.0/git-cp
 ```
 
 ### Single-file executables
@@ -51,29 +51,31 @@ dotnet build -c Release
 **Linux (x64)**
 ```bash
 dotnet publish -c Release -r linux-x64 --self-contained true \
-  -p:PublishSingleFile=true -p:AssemblyName=cp -o bin/publish/linux
+  -p:PublishSingleFile=true -o bin/publish/linux
 
 # Optionally put it on your PATH
-sudo cp bin/publish/linux/cp /usr/local/bin/cp
+sudo cp bin/publish/linux/git-cp /usr/local/bin/git-cp
 ```
 
 **Windows (x64)**
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true `
-  -p:PublishSingleFile=true -p:AssemblyName=cp -o bin/publish/win
+  -p:PublishSingleFile=true -o bin/publish/win
 
 # Optionally put it on your PATH (run as Administrator)
-copy bin\publish\win\cp.exe "C:\Windows\System32\cp.exe"
+copy bin\publish\win\git-cp.exe "C:\Windows\System32\git-cp.exe"
 ```
 
-> Run `cp` from inside any git repository.
+> Run `git-cp` or `git cp` from inside any git repository.
 
 ---
 
 ## Usage
 
 ```
-$ cp
+$ git-cp
+# or
+$ git cp
 ```
 
 The tool walks you through each step interactively:
