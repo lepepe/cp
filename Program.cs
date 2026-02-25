@@ -4,7 +4,7 @@ using Spectre.Console;
 
 // ── Banner ────────────────────────────────────────────────────────────────────
 
-AnsiConsole.Write(new FigletText("cp").Color(Color.CornflowerBlue));
+AnsiConsole.Write(new FigletText("git-cp").Color(Color.CornflowerBlue));
 AnsiConsole.MarkupLine("[grey]Interactive git cherry-pick helper[/]\n");
 
 // ── Locate repo ───────────────────────────────────────────────────────────────

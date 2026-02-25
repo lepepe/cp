@@ -23,7 +23,30 @@ Built with [Spectre.Console](https://spectreconsole.net/) on .NET 10.
 
 ---
 
-## Prerequisites
+## Installation
+
+> No .NET SDK needed on the target machine — the binaries are self-contained.
+
+**Linux**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lepepe/git-cp/main/install.sh | bash
+```
+
+**Windows** (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/lepepe/git-cp/main/install.ps1 | iex
+```
+
+Both scripts download the latest release binary from GitHub, place it in a
+user-local directory, and add that directory to your `PATH` automatically.
+
+After installation, restart your terminal and run `git cp` from inside any git repository.
+
+---
+
+## Prerequisites (for building from source)
 
 | Requirement | Version  |
 |-------------|----------|
@@ -36,7 +59,7 @@ Built with [Spectre.Console](https://spectreconsole.net/) on .NET 10.
 
 ```bash
 # Clone or enter the project directory
-cd cp
+cd git-cp
 
 # Run directly (development)
 dotnet run
@@ -49,6 +72,7 @@ dotnet build -c Release
 ### Single-file executables
 
 **Linux (x64)**
+
 ```bash
 dotnet publish -c Release -r linux-x64 --self-contained true \
   -p:PublishSingleFile=true -o bin/publish/linux
@@ -58,6 +82,7 @@ sudo cp bin/publish/linux/git-cp /usr/local/bin/git-cp
 ```
 
 **Windows (x64)**
+
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -o bin/publish/win
@@ -101,15 +126,37 @@ Step 7  A summary shows how many commits were applied or skipped
 
 ---
 
+## Releasing a new version
+
+Push a semver tag — the Actions workflow builds both binaries and publishes a
+GitHub Release automatically.
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The release will contain:
+
+- `git-cp-linux-x64` — self-contained Linux binary
+- `git-cp-win-x64.exe` — self-contained Windows binary
+
+---
+
 ## Project Structure
 
 ```
-cp/
-├── cp.csproj          # Project file (.NET 10, Spectre.Console 0.54)
-├── Program.cs         # App entry point — UI flow and cherry-pick loop
-├── GitService.cs      # Thin wrapper around git CLI commands
+git-cp/
+├── .github/
+│   └── workflows/
+│       └── release.yml    # CI: build & publish binaries on tag push
+├── cp.csproj              # Project file (.NET 10, Spectre.Console 0.54)
+├── Program.cs             # App entry point — UI flow and cherry-pick loop
+├── GitService.cs          # Thin wrapper around git CLI commands
+├── install.sh             # One-liner installer for Linux
+├── install.ps1            # One-liner installer for Windows
 └── Models/
-    └── CommitInfo.cs  # Record representing a single commit
+    └── CommitInfo.cs      # Record representing a single commit
 ```
 
 ---

@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # needed to create GitHub Releases
+
+jobs:
+  # ── Build binaries ──────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: git-cp
+          - os: windows-latest
+            rid: win-x64
+            artifact: git-cp.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish single-file binary
+        run: >
+          dotnet publish -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:DebugType=none
+          -p:DebugSymbols=false
+          -o publish/${{ matrix.rid }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: publish/${{ matrix.rid }}/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  # ── Create GitHub Release ───────────────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # Rename artifacts to include the platform suffix so both files
+      # are distinct when attached to the release.
+      - name: Rename artifacts
+        run: |
+          mv artifacts/linux-x64/git-cp      artifacts/git-cp-linux-x64
+          mv artifacts/win-x64/git-cp.exe    artifacts/git-cp-win-x64.exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/git-cp-linux-x64
+            artifacts/git-cp-win-x64.exe
