@@ -21,26 +21,36 @@ if (!git.IsGitRepo())
 // ── Source branch ─────────────────────────────────────────────────────────────
 
 var currentBranch = git.CurrentBranch();
-var allBranches   = git.AllBranches();
+var allBranches = git.AllBranches();
 
 AnsiConsole.MarkupLine($"[grey]Current branch:[/] [bold]{Markup.Escape(currentBranch)}[/]");
 
-var sourceBranch = AnsiConsole.Prompt(
-    new SelectionPrompt<string>()
-        .Title("Pick the [cornflowerblue]source branch[/] to cherry-pick from:")
-        .PageSize(12)
-        .HighlightStyle(new Style(foreground: Color.CornflowerBlue))
-        .AddChoices(allBranches));
+var branchPrompt = new SelectionPrompt<string>()
+    .Title("Pick the [cornflowerblue]source branch[/] to cherry-pick from:")
+    .PageSize(12)
+    .EnableSearch()
+    .SearchPlaceholderText("Type to search source branch...")
+    .HighlightStyle(new Style(foreground: Color.CornflowerBlue))
+    .AddChoices(allBranches);
+
+branchPrompt.SearchHighlightStyle = new Style(foreground: Color.Green, decoration: Decoration.Bold);
+
+var sourceBranch = AnsiConsole.Prompt(branchPrompt);
 
 // ── Load commits ──────────────────────────────────────────────────────────────
 
 List<CommitInfo> commits = [];
 
-AnsiConsole.Status().Start("Loading commits…", ctx =>
-{
-    ctx.Spinner(Spinner.Known.Dots);
-    commits = git.GetCommits(sourceBranch, limit: 60);
-});
+AnsiConsole
+    .Status()
+    .Start(
+        "Loading commits…",
+        ctx =>
+        {
+            ctx.Spinner(Spinner.Known.Dots);
+            commits = git.GetCommits(sourceBranch, limit: 60);
+        }
+    );
 
 if (commits.Count == 0)
 {
@@ -48,7 +58,7 @@ if (commits.Count == 0)
     return 0;
 }
 
-// ── Display commit table ──────────────────────────────────────────────────────
+// ── Display commit table
 
 var table = new Table()
     .Border(TableBorder.Rounded)
@@ -63,7 +73,8 @@ foreach (var c in commits)
         $"[cornflowerblue]{Markup.Escape(c.ShortHash)}[/]",
         $"[grey]{Markup.Escape(c.Date)}[/]",
         Markup.Escape(c.Author.Length > 20 ? c.Author[..20] : c.Author),
-        Markup.Escape(c.Message.Length > 70 ? c.Message[..70] + "…" : c.Message));
+        Markup.Escape(c.Message.Length > 70 ? c.Message[..70] + "…" : c.Message)
+    );
 
 AnsiConsole.Write(table);
 
@@ -71,11 +82,16 @@ AnsiConsole.Write(table);
 
 var selected = AnsiConsole.Prompt(
     new MultiSelectionPrompt<CommitInfo>()
-        .Title("\nSelect [cornflowerblue]commits[/] to cherry-pick [grey](Space = toggle, Enter = confirm)[/]:")
+        .Title(
+            "\nSelect [cornflowerblue]commits[/] to cherry-pick [grey](Space = toggle, Enter = confirm)[/]:"
+        )
         .PageSize(15)
         .NotRequired()
-        .UseConverter(c => $"[cornflowerblue]{c.ShortHash}[/] [grey]{c.Date}[/] {Markup.Escape(c.Author.Length > 18 ? c.Author[..18] : c.Author),-18} {Markup.Escape(c.Message.Length > 55 ? c.Message[..55] + "…" : c.Message)}")
-        .AddChoices(commits));
+        .UseConverter(c =>
+            $"[cornflowerblue]{c.ShortHash}[/] [grey]{c.Date}[/] {Markup.Escape(c.Author.Length > 18 ? c.Author[..18] : c.Author), -18} {Markup.Escape(c.Message.Length > 55 ? c.Message[..55] + "…" : c.Message)}"
+        )
+        .AddChoices(commits)
+);
 
 if (selected.Count == 0)
 {
@@ -88,33 +104,50 @@ AnsiConsole.MarkupLine($"\n[green]{selected.Count}[/] commit(s) selected.\n");
 // ── Target branch ─────────────────────────────────────────────────────────────
 
 var targetBranch = AnsiConsole.Prompt(
-    new TextPrompt<string>("Enter the [cornflowerblue]target branch[/] name:")
-        .Validate(name =>
-        {
-            if (string.IsNullOrWhiteSpace(name))   return ValidationResult.Error("[red]Branch name cannot be empty.[/]");
-            if (name.Contains(' '))                return ValidationResult.Error("[red]Branch name cannot contain spaces.[/]");
-            return ValidationResult.Success();
-        }));
+    new TextPrompt<string>("Enter the [cornflowerblue]target branch[/] name:").Validate(name =>
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return ValidationResult.Error("[red]Branch name cannot be empty.[/]");
+        if (name.Contains(' '))
+            return ValidationResult.Error("[red]Branch name cannot contain spaces.[/]");
+        return ValidationResult.Success();
+    })
+);
 
 // ── Checkout / create target branch ──────────────────────────────────────────
 
 AnsiConsole.WriteLine();
-AnsiConsole.Write(new Rule($"[cornflowerblue]Targeting branch:[/] [bold]{Markup.Escape(targetBranch)}[/]").RuleStyle("grey"));
+AnsiConsole.Write(
+    new Rule(
+        $"[cornflowerblue]Targeting branch:[/] [bold]{Markup.Escape(targetBranch)}[/]"
+    ).RuleStyle("grey")
+);
 
 if (git.BranchExists(targetBranch))
 {
     AnsiConsole.MarkupLine($"Branch [bold]{Markup.Escape(targetBranch)}[/] exists. Checking out…");
     var co = git.CheckoutExisting(targetBranch);
-    if (!co.Success) { PrintError("Checkout failed", co); return 1; }
+    if (!co.Success)
+    {
+        PrintError("Checkout failed", co);
+        return 1;
+    }
 }
 else
 {
-    var create = AnsiConsole.Confirm($"Branch [bold]{Markup.Escape(targetBranch)}[/] doesn't exist. Create it?");
-    if (!create) return 0;
+    var create = AnsiConsole.Confirm(
+        $"Branch [bold]{Markup.Escape(targetBranch)}[/] doesn't exist. Create it?"
+    );
+    if (!create)
+        return 0;
 
     AnsiConsole.MarkupLine($"Creating [bold]{Markup.Escape(targetBranch)}[/]…");
     var cb = git.CheckoutNew(targetBranch);
-    if (!cb.Success) { PrintError("Branch creation failed", cb); return 1; }
+    if (!cb.Success)
+    {
+        PrintError("Branch creation failed", cb);
+        return 1;
+    }
 }
 
 AnsiConsole.MarkupLine($"[green]✓[/] Now on [bold]{Markup.Escape(targetBranch)}[/]\n");
@@ -125,13 +158,16 @@ AnsiConsole.MarkupLine($"[green]✓[/] Now on [bold]{Markup.Escape(targetBranch)
 var toApply = selected.ToList();
 toApply.Reverse();
 
-int applied = 0, skipped = 0;
+int applied = 0,
+    skipped = 0;
 
 foreach (var commit in toApply)
 {
-    AnsiConsole.Write(new Rule(
-        $"[grey]Cherry-picking[/] [cornflowerblue]{commit.ShortHash}[/] — {Markup.Escape(commit.Message)}")
-        .RuleStyle("grey"));
+    AnsiConsole.Write(
+        new Rule(
+            $"[grey]Cherry-picking[/] [cornflowerblue]{commit.ShortHash}[/] — {Markup.Escape(commit.Message)}"
+        ).RuleStyle("grey")
+    );
 
     var result = git.CherryPick(commit.Hash);
 
@@ -153,19 +189,27 @@ foreach (var commit in toApply)
         var action = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("What do you want to do?")
-                .AddChoices("Skip this commit", "Abort all"));
+                .AddChoices("Skip this commit", "Abort all")
+        );
 
-        if (action == "Abort all") { git.CherryPickAbort(); break; }
+        if (action == "Abort all")
+        {
+            git.CherryPickAbort();
+            break;
+        }
         git.CherryPickSkip();
         skipped++;
         continue;
     }
 
     AnsiConsole.WriteLine();
-    AnsiConsole.Write(new Panel(
-        $"[red]Conflicts detected[/] in [bold]{Markup.Escape(commit.ShortHash)}[/] — {Markup.Escape(commit.Message)}")
-        .Border(BoxBorder.Rounded)
-        .BorderColor(Color.Red));
+    AnsiConsole.Write(
+        new Panel(
+            $"[red]Conflicts detected[/] in [bold]{Markup.Escape(commit.ShortHash)}[/] — {Markup.Escape(commit.Message)}"
+        )
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Red)
+    );
 
     // List conflicted files
     var fileTable = new Table()
@@ -180,11 +224,15 @@ foreach (var commit in toApply)
     bool keepShowing = true;
     while (keepShowing)
     {
-        var viewOptions = conflicted.Select(f => $"View: {f}").Append("Done viewing diffs").ToList();
+        var viewOptions = conflicted
+            .Select(f => $"View: {f}")
+            .Append("Done viewing diffs")
+            .ToList();
         var view = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("Show conflict diff for a file?")
-                .AddChoices(viewOptions));
+                .AddChoices(viewOptions)
+        );
 
         if (view == "Done viewing diffs")
         {
@@ -207,7 +255,9 @@ foreach (var commit in toApply)
             .AddChoices(
                 "I fixed it manually — stage & continue",
                 "Skip this commit",
-                "Abort all remaining cherry-picks"));
+                "Abort all remaining cherry-picks"
+            )
+    );
 
     switch (resolution)
     {
@@ -251,12 +301,51 @@ var summary = new Table()
     .AddColumn("Result")
     .AddColumn("Count");
 
-summary.AddRow("[green]Applied[/]",  $"[green]{applied}[/]");
+summary.AddRow("[green]Applied[/]", $"[green]{applied}[/]");
 summary.AddRow("[yellow]Skipped[/]", $"[yellow]{skipped}[/]");
-summary.AddRow("Total selected",    $"{selected.Count}");
+summary.AddRow("Total selected", $"{selected.Count}");
 
 AnsiConsole.Write(summary);
 AnsiConsole.MarkupLine($"\n[grey]Branch:[/] [bold]{Markup.Escape(targetBranch)}[/]");
+
+// ── Push prompt ───────────────────────────────────────────────────────────────
+
+if (applied > 0 && git.RemoteExists("origin"))
+{
+    AnsiConsole.WriteLine();
+    var pushCommand = $"git push origin {targetBranch}";
+    var doPush = AnsiConsole.Confirm(
+        $"Push to remote? [grey]({Markup.Escape(pushCommand)})[/]",
+        defaultValue: false
+    );
+
+    if (doPush)
+    {
+        GitResult pushResult;
+        AnsiConsole
+            .Status()
+            .Start(
+                "Pushing…",
+                ctx =>
+                {
+                    ctx.Spinner(Spinner.Known.Dots);
+                    pushResult = git.Push("origin", targetBranch);
+
+                    // Branch not yet tracked — retry with --set-upstream
+                    if (!pushResult.Success && pushResult.Error.Contains("no upstream"))
+                        pushResult = git.PushSetUpstream("origin", targetBranch);
+
+                    if (pushResult.Success)
+                        AnsiConsole.MarkupLine(
+                            $"[green]✓[/] Pushed [bold]{Markup.Escape(targetBranch)}[/] to origin."
+                        );
+                    else
+                        PrintError("Push failed", pushResult);
+                }
+            );
+    }
+}
+
 AnsiConsole.MarkupLine("[green]Done![/]");
 
 return 0;
@@ -265,11 +354,12 @@ return 0;
 
 static void PrintError(string title, GitResult r)
 {
-    AnsiConsole.Write(new Panel(
-        $"[red]{Markup.Escape(r.CombinedOutput.Trim())}[/]")
-        .Header($"[red] {Markup.Escape(title)} [/]")
-        .Border(BoxBorder.Rounded)
-        .BorderColor(Color.Red));
+    AnsiConsole.Write(
+        new Panel($"[red]{Markup.Escape(r.CombinedOutput.Trim())}[/]")
+            .Header($"[red] {Markup.Escape(title)} [/]")
+            .Border(BoxBorder.Rounded)
+            .BorderColor(Color.Red)
+    );
 }
 
 static void PrintColoredDiff(string diff)
@@ -283,9 +373,13 @@ static void PrintColoredDiff(string diff)
     foreach (var line in diff.Split('\n'))
     {
         var escaped = Markup.Escape(line);
-        if      (line.StartsWith('+'))  AnsiConsole.MarkupLine($"[green]{escaped}[/]");
-        else if (line.StartsWith('-'))  AnsiConsole.MarkupLine($"[red]{escaped}[/]");
-        else if (line.StartsWith('@'))  AnsiConsole.MarkupLine($"[cornflowerblue]{escaped}[/]");
-        else                            AnsiConsole.WriteLine(line);
+        if (line.StartsWith('+'))
+            AnsiConsole.MarkupLine($"[green]{escaped}[/]");
+        else if (line.StartsWith('-'))
+            AnsiConsole.MarkupLine($"[red]{escaped}[/]");
+        else if (line.StartsWith('@'))
+            AnsiConsole.MarkupLine($"[cornflowerblue]{escaped}[/]");
+        else
+            AnsiConsole.WriteLine(line);
     }
 }
