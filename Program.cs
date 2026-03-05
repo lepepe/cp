@@ -220,30 +220,42 @@ foreach (var commit in toApply)
         fileTable.AddRow(Markup.Escape(f));
     AnsiConsole.Write(fileTable);
 
-    // Optional: view diffs per file
+    // View / edit conflicted files
+    var editor = git.ResolveEditor();
     bool keepShowing = true;
     while (keepShowing)
     {
         var viewOptions = conflicted
-            .Select(f => $"View: {f}")
-            .Append("Done viewing diffs")
+            .SelectMany(f => new[] { $"View diff: {f}", $"Edit in {editor}: {f}" })
+            .Append("Done — proceed to resolution")
             .ToList();
+
         var view = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
-                .Title("Show conflict diff for a file?")
+                .Title("Inspect or edit a conflicted file:")
+                .PageSize(12)
+                .HighlightStyle(new Style(foreground: Color.CornflowerBlue))
                 .AddChoices(viewOptions)
         );
 
-        if (view == "Done viewing diffs")
+        if (view == "Done — proceed to resolution")
         {
             keepShowing = false;
         }
-        else
+        else if (view.StartsWith("View diff: "))
         {
-            var file = view["View: ".Length..];
+            var file = view["View diff: ".Length..];
             var diff = git.GetConflictDiff(file);
             AnsiConsole.Write(new Rule($"[yellow]{Markup.Escape(file)}[/]").RuleStyle("yellow"));
             PrintColoredDiff(diff);
+        }
+        else if (view.StartsWith($"Edit in {editor}: "))
+        {
+            var file = view[$"Edit in {editor}: ".Length..];
+            var filePath = Path.Combine(git.RepoPath, file);
+            AnsiConsole.MarkupLine($"[grey]Opening [bold]{Markup.Escape(file)}[/] in {Markup.Escape(editor)}…[/]");
+            git.OpenInEditor(filePath);
+            AnsiConsole.MarkupLine($"[green]✓[/] Returned from editor.");
         }
     }
 

@@ -6,11 +6,11 @@ namespace cp;
 
 public class GitService
 {
-    private readonly string _repoPath;
+    public string RepoPath { get; }
 
     public GitService(string repoPath)
     {
-        _repoPath = repoPath;
+        RepoPath = repoPath;
     }
 
     // ── Basic checks ────────────────────────────────────────────────────────
@@ -104,6 +104,29 @@ public class GitService
 
     public GitResult StageAll() => Run("add", "-A");
 
+    // ── Editor ───────────────────────────────────────────────────────────────
+
+    public string ResolveEditor()
+    {
+        return Environment.GetEnvironmentVariable("VISUAL")
+            ?? Environment.GetEnvironmentVariable("EDITOR")
+            ?? (OperatingSystem.IsWindows() ? "notepad" : "vi");
+    }
+
+    public void OpenInEditor(string file)
+    {
+        var editor = ResolveEditor();
+        var psi = new ProcessStartInfo(editor, $"\"{file}\"")
+        {
+            WorkingDirectory = RepoPath,
+            UseShellExecute  = false,
+            // No stream redirection — the editor must own the terminal
+        };
+
+        using var proc = Process.Start(psi)!;
+        proc.WaitForExit();
+    }
+
     // ── Remote ───────────────────────────────────────────────────────────────
 
     public GitResult Push(string remote, string branch) => Run("push", remote, branch);
@@ -123,7 +146,7 @@ public class GitService
     {
         var psi = new ProcessStartInfo("git")
         {
-            WorkingDirectory = _repoPath,
+            WorkingDirectory = RepoPath,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
