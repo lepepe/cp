@@ -222,11 +222,20 @@ foreach (var commit in toApply)
 
     // View / edit conflicted files
     var editor = git.ResolveEditor();
+    var resolvedFiles = new HashSet<string>();
     bool keepShowing = true;
     while (keepShowing)
     {
         var viewOptions = conflicted
-            .SelectMany(f => new[] { $"View diff: {f}", $"Edit in {editor}: {f}" })
+            .SelectMany(f =>
+            {
+                var check = resolvedFiles.Contains(f) ? "[green]✓[/] " : "   ";
+                return new[]
+                {
+                    $"{check}View diff: {f}",
+                    $"{check}Edit in {editor}: {f}",
+                };
+            })
             .Append("Done — proceed to resolution")
             .ToList();
 
@@ -242,20 +251,28 @@ foreach (var commit in toApply)
         {
             keepShowing = false;
         }
-        else if (view.StartsWith("View diff: "))
+        else if (view.Contains("View diff: "))
         {
-            var file = view["View diff: ".Length..];
+            var file = view[(view.IndexOf("View diff: ") + "View diff: ".Length)..];
             var diff = git.GetConflictDiff(file);
             AnsiConsole.Write(new Rule($"[yellow]{Markup.Escape(file)}[/]").RuleStyle("yellow"));
             PrintColoredDiff(diff);
         }
-        else if (view.StartsWith($"Edit in {editor}: "))
+        else if (view.Contains($"Edit in {editor}: "))
         {
-            var file = view[$"Edit in {editor}: ".Length..];
+            var editKey = $"Edit in {editor}: ";
+            var file = view[(view.IndexOf(editKey) + editKey.Length)..];
             var filePath = Path.Combine(git.RepoPath, file);
+
+            if (GitService.IsGuiEditor(editor))
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Tip:[/] GUI editors need [bold]--wait[/] in $EDITOR so the app blocks " +
+                    $"until you close the file. Example: [grey]export EDITOR=\"{Markup.Escape(editor)} --wait\"[/]");
+
             AnsiConsole.MarkupLine($"[grey]Opening [bold]{Markup.Escape(file)}[/] in {Markup.Escape(editor)}…[/]");
             git.OpenInEditor(filePath);
-            AnsiConsole.MarkupLine($"[green]✓[/] Returned from editor.");
+            resolvedFiles.Add(file);
+            AnsiConsole.MarkupLine($"[green]✓[/] Returned from editor. {Markup.Escape(file)} marked as resolved.");
         }
     }
 

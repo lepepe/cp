@@ -116,16 +116,36 @@ public class GitService
     public void OpenInEditor(string file)
     {
         var editor = ResolveEditor();
-        var psi = new ProcessStartInfo(editor, $"\"{file}\"")
+
+        if (!OperatingSystem.IsWindows())
+        {
+            // Spectre.Console leaves the terminal in raw/no-echo mode after
+            // interactive prompts. Reset it to a sane state so that terminal
+            // editors (nvim, vim, nano …) can initialise properly.
+            using var stty = Process.Start(new ProcessStartInfo("stty", "sane")
+            {
+                UseShellExecute = false,
+            });
+            stty?.WaitForExit();
+        }
+
+        var psi = new ProcessStartInfo(editor)
         {
             WorkingDirectory = RepoPath,
             UseShellExecute  = false,
             // No stream redirection — the editor must own the terminal
         };
+        psi.ArgumentList.Add(file);
 
         using var proc = Process.Start(psi)!;
         proc.WaitForExit();
     }
+
+    /// <summary>Returns true for known GUI editors that need --wait to block.</summary>
+    public static bool IsGuiEditor(string editor) =>
+        editor.StartsWith("code") || editor.StartsWith("subl") ||
+        editor.StartsWith("atom") || editor.StartsWith("gedit") ||
+        editor.StartsWith("kate");
 
     // ── Remote ───────────────────────────────────────────────────────────────
 
